@@ -1,0 +1,130 @@
+---
+title: "Hubbard Brook Well"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+
+setwd("~/R/HBwellStart")
+
+list.files()
+
+#Choose well being visualized
+ID <- "D1"
+
+#Choose beginning of date range 
+start <- "2011-07-01"
+
+#Choose end of date range 
+end <- "2011-10-31"
+
+#Read in well being assigned to the ID variable
+well <- read_csv(paste("Data/", ID, ".txt", sep = ""))
+
+#Remove wells with a value of -99
+well$level <-  na_if(well$level, -99)
+
+#replace the level values above 168 with NA so that they do not show up on the #graph 
+well$level <- replace(well$level, well$level > 168, NA)
+
+#create new variable containing the "w3well_locations" file 
+info <- read_csv("w3well_locations.txt")
+
+PH <- info$PipeHt[info$Well == ID]
+
+#Subtract the pipeheight from the level data 
+well$level <- well$level - PH
+
+#Create a new variable that has the date range selected using the "start" and #"end" variables
+welltime <- filter(well, date >= start, date <= end)
+
+#Make a line plot of the well selected, with a date range 
+ggplot(data = welltime, mapping = aes(x = date, y = level))+
+  geom_line()+
+  scale_y_reverse()+
+  ylab("Water level (cm)")+
+  theme_classic()
+
+```
+
+Reading in multiple wells and plotting 
+```{r}
+library(purrr)
+library(tidyr)
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+
+info <- read_csv("w3well_locations.txt")
+
+setwd("~/R/HBwellStart/Data")
+
+#create character vector with names of each .txt file within set working directory 
+files <- dir(pattern = ".txt")
+
+#bind_rows(welldata, .id = "Well")
+
+welldata <- data_frame(filename = files) %>% # create a data frame
+                                         # holding the file names
+  mutate(file_contents = map(filename,          # read files into
+           ~ read_csv(file.path( .))) # a new data column
+        )%>%
+  unnest()
+
+#take away .txt at end of well name in the "Well" column 
+welldata$Well <- str_replace(welldata$filename, ".txt", "")
+
+#Join W3Well_locations.txt file to the data frame and Keep each row of data #assigned to the proper well (i.e. all rows that belong to well A5 will have A5 #in the "Well" column)
+welldata <- left_join(welldata, info, by = "Well")
+  
+#Remove well data with -99 value 
+welldata$level <- na_if(welldata$level, -99)
+
+#replace the level values above 168 with NA so that they do not show up on the #graph 
+welldata$level <- replace(welldata$level, welldata$level > 168, NA)
+  
+#Subtract pipe height from level in order to get column that is depth of water #table to surface 
+welldata$wtdepth <- welldata$level - welldata$PipeHt
+  
+#Keep only columns needed in data frame 
+welldata <- select(welldata, date, level, Well, PipeHt, wtdepth)
+  
+#create csv file with the new data frame (makes app simpler by taking away need to do data wrangling in app)
+write.csv(welldata, "allwelldata.csv")
+```
+
+```{r}
+#Create new variable containing wells being plotted
+ID <- c("K9", "N5", "N1", "Q1", "H4", "A5")
+
+#Choose the beginning of the date range by creating a new variable 
+start <- ymd("2011-08-15")
+
+#Choose the end of the date range by creating a new variable 
+end <- ymd("2011-12-15")
+
+#Create new variable that filters out the wells selected and the date #range #selected for plotting
+wells <- filter(welldata, Well == ID, date >= start, date <= end)
+
+#Make a line plot of the wells and dates selected, with a different line color for each well
+ggplot(data = wells, mapping = aes(x = date, y = wtdepth, color = Well))+
+  geom_line()+
+  scale_y_reverse()+
+  ylab("Water Table Depth (cm)")+
+  theme_classic()
+```
+
+```{r}
+welldatahourly <- welldata[c(TRUE,rep(FALSE,5)), ]
+
+welldatahourly
+
+write_csv(welldatahourly, "allwelldatahourly.csv")
+```
+
+```{r}
+welldata
+```
+
