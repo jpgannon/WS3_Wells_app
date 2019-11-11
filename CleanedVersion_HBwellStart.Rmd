@@ -124,7 +124,5 @@ welldatahourly
 write_csv(welldatahourly, "allwelldatahourly.csv")
 ```
 
-```{r}
-welldata
-```
+
 

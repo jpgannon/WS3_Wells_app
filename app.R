@@ -32,8 +32,13 @@ ui <- fluidPage(
         ),
 
         # Show a plot of the water level data
-        mainPanel(
-           plotOutput("wellplot")
+        fluidRow(
+           plotOutput("wellplot", 
+                      dblclick = "plot1_dblclick",
+                      brush = brushOpts(
+                        id = "plot1_brush",
+                        resetOnNew = TRUE
+                      ))
         )
     )
 )
@@ -41,10 +46,11 @@ ui <- fluidPage(
 # Define server logic required to draw a line plot 
 server <- function(input, output) {
   
-  #setwd('C:/Users/KT/Documents/R/HBwellStart/Data')
+  setwd('C:/Users/KT/Documents/R/HBwellStart/Data')
       
     welldata <- read_csv("allwelldatahourly.csv")
     
+    ranges <- reactiveValues(y = c(start = "2010-08-01", end = "2013-01-10"))
     
     output$wellplot <- renderPlot({
       ID <- strsplit(input$wells, " ")[[1]]
@@ -55,11 +61,28 @@ server <- function(input, output) {
       
       wells <- filter(welldata, Well == ID, date >= start, date <= end)
       
+      #ymin <- input$plot_brush$ymin
+      
+      #ymax <- input$plot_brush$ymax
+      
       ggplot(data = wells, mapping = aes(x = date, y = wtdepth, color = Well))+
         geom_line()+
         scale_y_reverse()+
         ylab("Water Table Depth (cm)")+
+        ylim(ranges$y)+
         theme_classic()
+    })
+    
+    observeEvent(input$plot1_dblclick, {
+      brush <- input$plot1_brush
+      if (!is.null(brush)) {
+        #ranges$x <- c(brush$xmin, brush$xmax)
+        ranges$y <- c(brush$ymin, brush$ymax)
+        
+      } else {
+        #ranges$x <- NULL
+        ranges$y <- c(input$date[1], input$date[2])
+      }
     })
 }
 
