@@ -7,7 +7,7 @@ output: html_notebook
 library(ggplot2)
 library(tidyverse)
 
-setwd("~/R/HBwellStart")
+setwd("~/R/HBwellStart/Data")
 
 list.files()
 
@@ -20,13 +20,13 @@ start <- "2011-07-01"
 #Choose end of date range 
 end <- "2011-10-31"
 
-#Read in well being assigned to the ID variable
-well <- read_csv(paste("Data/", ID, ".txt", sep = ""))
+#Read in well chosen above when creating the ID variable
+well <- read_csv(paste(ID, ".txt", sep = ""))
 
 #Remove wells with a value of -99
 well$level <-  na_if(well$level, -99)
 
-#replace the level values above 168 with NA so that they do not show up on the #graph 
+#replace the level values above 168 with NA so that they do not show up on the graph 
 well$level <- replace(well$level, well$level > 168, NA)
 
 #create new variable containing the "w3well_locations" file 
@@ -37,7 +37,7 @@ PH <- info$PipeHt[info$Well == ID]
 #Subtract the pipeheight from the level data 
 well$level <- well$level - PH
 
-#Create a new variable that has the date range selected using the "start" and #"end" variables
+#Create a new variable that has the date range selected using the "start" and "end" variables
 welltime <- filter(well, date >= start, date <= end)
 
 #Make a line plot of the well selected, with a date range 
@@ -57,11 +57,12 @@ library(dplyr)
 library(tidyverse)
 library(lubridate)
 
-info <- read_csv("w3well_locations.txt")
-
 setwd("~/R/HBwellStart/Data")
 
-#create character vector with names of each .txt file within set working directory 
+#Create a variable that contains the w3well_locations file
+info <- read_csv("WellLocationsandPipeHt.csv")
+
+#create character vector with names of each .txt file that is within the set working directory 
 files <- dir(pattern = ".txt")
 
 #bind_rows(welldata, .id = "Well")
@@ -73,22 +74,23 @@ welldata <- data_frame(filename = files) %>% # create a data frame
         )%>%
   unnest()
 
+
 #take away .txt at end of well name in the "Well" column 
 welldata$Well <- str_replace(welldata$filename, ".txt", "")
 
-#Join W3Well_locations.txt file to the data frame and Keep each row of data #assigned to the proper well (i.e. all rows that belong to well A5 will have A5 #in the "Well" column)
+#Join W3Well_locations.txt file to the data frame and Keep each row of data assigned to the proper well (i.e. all rows that belong to well A5 will have A5 #in the "Well" column)
 welldata <- left_join(welldata, info, by = "Well")
   
 #Remove well data with -99 value 
 welldata$level <- na_if(welldata$level, -99)
 
-#replace the level values above 168 with NA so that they do not show up on the #graph 
+#replace the level values above 168 with NA so that they do not show up on the graph 
 welldata$level <- replace(welldata$level, welldata$level > 168, NA)
   
-#Subtract pipe height from level in order to get column that is depth of water #table to surface 
+#Subtract pipe height from level in order to get column that is depth of water table to surface 
 welldata$wtdepth <- welldata$level - welldata$PipeHt
   
-#Keep only columns needed in data frame 
+#Create a new dataframe that has only the wells wanted (select wells wanting to keep)
 welldata <- select(welldata, date, level, Well, PipeHt, wtdepth)
   
 #create csv file with the new data frame (makes app simpler by taking away need to do data wrangling in app)
@@ -117,11 +119,25 @@ ggplot(data = wells, mapping = aes(x = date, y = wtdepth, color = Well))+
 ```
 
 ```{r}
-welldatahourly <- welldata[c(TRUE,rep(FALSE,5)), ]
 
-welldatahourly
+welldata$date <- ymd_hms(welldata$date)
 
-write_csv(welldatahourly, "allwelldatahourly.csv")
+welldata %>% group_by(Well, year(date), month(date), day(date), hour(date)) %>%
+    summarize(median(level), median(wtdepth)) -> hourly
+
+colnames(hourly) <- c("Well", "year","month","day", "hour", "level","wtdepth")  
+
+hourly$date <- dmy_h(paste(hourly$day, hourly$month, hourly$year, hourly$hour))
+
+hourly <- hourly %>% ungroup() %>%
+    select(Well, date, level, wtdepth) 
+
+
+#welldatahourly <- aggregate(welldata$level,
+                      #list(hour = cut(welldata$date, breaks="hour")),
+                      #mean, na.rm = TRUE)
+
+write_csv(hourly, "welldatahourly.csv")
 ```
 
 
